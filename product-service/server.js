@@ -1,8 +1,27 @@
-const app = require('./app');
-require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const productRoutes = require('./routes/productRoutes'); 
 
-const PORT = process.env.PORT || 3000;
+const app = express();
 
-app.listen(PORT, () => {
-    console.log(`Product service berjalan di http://localhost:${PORT}`);
+app.use(cors());
+app.use(express.json());
+
+// endpoint for health check
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: "ok",
+        service: "product-service"
+    });
 });
+
+app.use("/products", productRoutes);
+
+//unknown path
+app.use((req, res) => {
+    res.status(404).json({
+        message: "Endpoint tidak dikenal"
+    });
+});
+
+module.exports = app;
