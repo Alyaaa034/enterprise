@@ -1,27 +1,7 @@
-const express = require('express');
-const cors = require('cors');
-const productRoutes = require('./routes/productRoutes'); 
+const app = require('./app');
 
-const app = express();
+const port = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
-
-// endpoint for health check
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: "ok",
-        service: "product-service"
-    });
+app.listen(port, () => {
+    console.log(`Product service listening on port ${port}`);
 });
-
-app.use("/products", productRoutes);
-
-//unknown path
-app.use((req, res) => {
-    res.status(404).json({
-        message: "Endpoint tidak dikenal"
-    });
-});
-
-module.exports = app;

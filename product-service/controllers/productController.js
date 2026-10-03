@@ -1,104 +1,153 @@
 const productModel = require('../models/productModel');
+const validateImage = require('./imageValidation');
 
-function parseId(value) {
-    const id = Number(value);
-    return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function validateProduct(body) {
-    body = body || {};
-    const { name, price, stock } = body;
-    const errors = [];
-
-    if (typeof name !== 'string' || name.trim() === '') {
-        errors.push('name wajib berupa teks dan tidak boleh kosong');
-    }
-    if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
-        errors.push('price wajib berupa angka >= 0');
-    }
-    if (!Number.isInteger(stock) || stock < 0) {
-        errors.push('stock wajib berupa bilangan bulat >= 0');
-    }
-
-    return errors;
-}
-
-function productPayload(body) {
-    body = body || {};
-    return {
-        name: body.name.trim(),
-        description: body.description == null ? null : String(body.description),
-        price: body.price,
-        stock: body.stock
-    };
-}
-
-async function index(req, res) {
+// Controller untuk mengambil semua produk
+async function getAllProducts(req, res) {
     try {
         const products = await productModel.getAllProducts();
-        res.status(200).json({ data: products });
+
+        res.json({
+            message: "Berhasil mengambil data produk",
+            data: products
+        });
     } catch (error) {
-        console.error('Failed to list products:', error);
-        res.status(500).json({ message: 'Gagal mengambil data product' });
+        res.status(500).json({
+            message: "Gagal mengambil produk",
+            error: error.message
+        });
     }
 }
 
-async function show(req, res) {
-    const id = parseId(req.params.id);
-    if (!id) return res.status(400).json({ message: 'ID product tidak valid' });
-
+// Controller untuk mengambil produk berdasarkan ID
+async function getProductById(req, res) {
     try {
+        const { id } = req.params;
+
         const product = await productModel.getProductById(id);
-        if (!product) return res.status(404).json({ message: 'Product tidak ditemukan' });
-        res.status(200).json({ data: product });
+
+        if (!product) {
+            return res.status(404).json({
+                message: "Produk tidak ditemukan"
+            });
+        }
+
+        res.json({
+            message: "Berhasil mengambil data produk",
+            data: product
+        });
     } catch (error) {
-        console.error('Failed to get product:', error);
-        res.status(500).json({ message: 'Gagal mengambil product' });
+        res.status(500).json({
+            message: "Gagal mengambil produk",
+            error: error.message
+        });
     }
 }
 
-async function store(req, res) {
-    const errors = validateProduct(req.body);
-    if (errors.length) return res.status(400).json({ message: 'Data product tidak valid', errors });
-
+// Controller untuk membuat produk baru
+async function createProduct(req, res) {
     try {
-        const product = await productModel.createProduct(productPayload(req.body));
-        res.status(201).json({ message: 'Product berhasil dibuat', data: product });
+        const { name, description, price, stock, image } = req.body || {};
+        const imageError = validateImage(image);
+
+        if (imageError) {
+            return res.status(400).json({
+                message: imageError
+            });
+        }
+
+        const product = await productModel.createProduct({
+            name,
+            description,
+            price,
+            stock,
+            image
+        });
+
+        res.status(201).json({
+            message: "Berhasil membuat produk",
+            data: product
+        });
     } catch (error) {
-        console.error('Failed to create product:', error);
-        res.status(500).json({ message: 'Gagal membuat product' });
+        res.status(500).json({
+            message: "Gagal membuat produk",
+            error: error.message
+        });
     }
 }
 
-async function update(req, res) {
-    const id = parseId(req.params.id);
-    if (!id) return res.status(400).json({ message: 'ID product tidak valid' });
-    const errors = validateProduct(req.body);
-    if (errors.length) return res.status(400).json({ message: 'Data product tidak valid', errors });
-
+// Controller untuk mengupdate produk
+async function updateProduct(req, res) {
     try {
-        const existing = await productModel.getProductById(id);
-        if (!existing) return res.status(404).json({ message: 'Product tidak ditemukan' });
-        const product = await productModel.updateProduct(id, productPayload(req.body));
-        res.status(200).json({ message: 'Product berhasil diubah', data: product });
+        const { id } = req.params;
+        const { name, description, price, stock, image } = req.body || {};
+        const imageError = validateImage(image);
+
+        if (imageError) {
+            return res.status(400).json({
+                message: imageError
+            });
+        }
+
+        // Cek apakah produk tersedia
+        const existingProduct = await productModel.getProductById(id);
+
+        if (!existingProduct) {
+            return res.status(404).json({
+                message: "Produk tidak ditemukan"
+            });
+        }
+
+        const product = await productModel.updateProduct(id, {
+            name,
+            description,
+            price,
+            stock,
+            image
+        });
+
+        res.json({
+            message: "Berhasil mengupdate produk",
+            data: product
+        });
     } catch (error) {
-        console.error('Failed to update product:', error);
-        res.status(500).json({ message: 'Gagal mengubah product' });
+        res.status(500).json({
+            message: "Gagal mengupdate produk",
+            error: error.message
+        });
     }
 }
 
-async function destroy(req, res) {
-    const id = parseId(req.params.id);
-    if (!id) return res.status(400).json({ message: 'ID product tidak valid' });
-
+// Controller untuk menghapus produk
+async function deleteProduct(req, res) {
     try {
-        const deleted = await productModel.deleteProduct(id);
-        if (!deleted) return res.status(404).json({ message: 'Product tidak ditemukan' });
-        res.status(200).json({ message: 'Product berhasil dihapus' });
+        const { id } = req.params;
+
+        // Cek apakah produk tersedia
+        const existingProduct = await productModel.getProductById(id);
+
+        if (!existingProduct) {
+            return res.status(404).json({
+                message: "Produk tidak ditemukan"
+            });
+        }
+
+        await productModel.deleteProduct(id);
+
+        res.json({
+            message: "Berhasil menghapus produk"
+        });
     } catch (error) {
-        console.error('Failed to delete product:', error);
-        res.status(500).json({ message: 'Gagal menghapus product' });
+        res.status(500).json({
+            message: "Gagal menghapus produk",
+            error: error.message
+        });
     }
 }
 
-module.exports = { index, show, store, update, destroy };
+module.exports = {
+    getAllProducts,
+    getProductById,
+    createProduct,
+    updateProduct,
+    deleteProduct
+};
