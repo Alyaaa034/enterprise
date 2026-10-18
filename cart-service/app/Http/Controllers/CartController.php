@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CartItemNotFoundException;
+use App\Exceptions\ProductNotFoundException;
 use App\Http\Requests\AddCartItemRequest;
 use App\Http\Requests\UpdateCartItemRequest;
 use App\Services\CartService;
@@ -29,29 +30,28 @@ class CartController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Terjadi kesalahan pada server.',
-            ], 500);
+                'message' => 'Terjadi kesalahan pada server.'], 500);
         }
     }
 
     public function store(AddCartItemRequest $request): JsonResponse
     {
         try {
+            $data = $request->validated();
             $item = $this->cartService->addItem(
-                $request->integer('user_id'),
-                $request->integer('product_id'),
-                $request->integer('quantity', 1)
+                (int) $data['user_id'],
+                (int) $data['product_id'],
+                (int) ($data['quantity'] ?? 1)
             );
 
-            return response()->json($item, $item->wasRecentlyCreated ? 201 : 200);
-        } catch (Throwable $e) {
-            Log::error('Gagal menambahkan item ke cart', [
-                'error' => $e->getMessage(),
-            ]);
-
             return response()->json([
-                'message' => 'Terjadi kesalahan pada server.',
-            ], 500);
+                'message' => 'Item berhasil ditambahkan ke keranjang.',
+                'data' => $item,
+            ], $item->wasRecentlyCreated ? 201 : 200);
+        } catch (ProductNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (Throwable $e) {
+            return $this->errorResponse($e, 'menambahkan item');
         }
     }
 
@@ -60,26 +60,34 @@ class CartController extends Controller
         int $id
     ): JsonResponse {
         try {
+            $data = $request->validated();
             $item = $this->cartService->updateQuantity(
                 $id,
-                $request->integer('quantity')
+                (int) $data['quantity']
             );
 
-            return response()->json($item);
+            return response()->json([
+                'message' => 'Jumlah item berhasil diperbarui.',
+                'data' => $item,
+            ]);
         } catch (CartItemNotFoundException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 404);
         } catch (Throwable $e) {
-            Log::error('Gagal mengubah quantity cart item', [
-                'id' => $id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'message' => 'Terjadi kesalahan pada server.',
-            ], 500);
+            return $this->errorResponse($e, 'memperbarui item');
         }
+    }
+
+    private function errorResponse(Throwable $e, string $action): JsonResponse
+    {
+        Log::error("Gagal {$action} cart item", [
+            'error' => $e->getMessage(),
+        ]);
+
+        return response()->json([
+            'message' => 'Terjadi kesalahan pada server.',
+        ], 500);
     }
 
     public function destroy(int $id): JsonResponse
