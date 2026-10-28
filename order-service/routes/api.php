@@ -9,4 +9,6 @@ Route::get('/health', function () {
         'service' => 'order-service',
     ]);
 });
+
 Route::post('/orders', [OrderController::class, 'store']);
+Route::get('/orders/{id}', [OrderController::class, 'show']);

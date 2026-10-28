@@ -21,6 +21,9 @@ class OrderController extends Controller
         private CartServiceClient $cartService
     ) {}
 
+    /**
+     * Membuat pesanan berdasarkan isi keranjang pengguna.
+     */
     public function store(Request $request): JsonResponse
     {
         try {
@@ -92,11 +95,14 @@ class OrderController extends Controller
             try {
                 $this->cartService->clearCart($userId);
             } catch (Throwable $e) {
-                Log::error('Order berhasil dibuat, tetapi cart gagal dikosongkan.', [
-                    'order_id' => $order->id,
-                    'user_id' => $userId,
-                    'error' => $e->getMessage(),
-                ]);
+                Log::error(
+                    'Order berhasil dibuat, tetapi cart gagal dikosongkan.',
+                    [
+                        'order_id' => $order->id,
+                        'user_id' => $userId,
+                        'error' => $e->getMessage(),
+                    ]
+                );
             }
 
             return response()->json([
@@ -106,18 +112,22 @@ class OrderController extends Controller
 
         } catch (ValidationException $e) {
             throw $e;
+
         } catch (ProductNotFoundException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 409);
+
         } catch (RuntimeException $e) {
-            Log::error('Gagal membuat order karena layanan terkait bermasalah.', [
-                'error' => $e->getMessage(),
-            ]);
+            Log::error(
+                'Gagal membuat order karena layanan terkait bermasalah.',
+                ['error' => $e->getMessage()]
+            );
 
             return response()->json([
                 'message' => 'Layanan produk atau keranjang sedang bermasalah.',
             ], 503);
+
         } catch (Throwable $e) {
             Log::error('Gagal membuat order.', [
                 'error' => $e->getMessage(),
@@ -127,5 +137,30 @@ class OrderController extends Controller
                 'message' => 'Terjadi kesalahan saat membuat pesanan.',
             ], 500);
         }
+    }
+
+    /**
+     * Mengambil detail pesanan berdasarkan ID.
+     */
+    public function show(string $id): JsonResponse
+    {
+        if (!ctype_digit($id) || (int) $id < 1) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.',
+            ], 404);
+        }
+
+        $order = Order::with('items')->find((int) $id);
+
+        if (!$order) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.',
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Detail pesanan berhasil diambil.',
+            'data' => $order,
+        ], 200);
     }
 }
