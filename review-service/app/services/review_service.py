@@ -30,6 +30,13 @@ def create_review(data):
     # Pastikan produk tersedia sebelum membuat review.
     get_product(product_id)
 
+    if review_model.get_review_by_user_and_product(
+        data["user_id"], product_id
+    ):
+        raise DuplicateReviewError(
+            "Pengguna sudah memberikan review untuk produk ini"
+        )
+
     try:
         return review_model.create_review(data)
     except DuplicateKeyError as exc:

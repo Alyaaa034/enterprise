@@ -6,6 +6,11 @@ from app.controllers import review_controller
 review_bp = Blueprint("reviews", __name__)
 
 
+@review_bp.route("/health", methods=["GET"])
+def health_check():
+    return review_controller.health_check()
+
+
 @review_bp.route("/reviews/product/<int:product_id>", methods=["GET"])
 def list_product_reviews(product_id):
     return review_controller.list_product_reviews(product_id)

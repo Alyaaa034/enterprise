@@ -2,7 +2,6 @@
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from pymongo.errors import DuplicateKeyError
 
 from app.database import reviews_collection
 
@@ -32,6 +31,13 @@ def create_review(data):
     document["_id"] = result.inserted_id
 
     return _serialize_review(document)
+
+
+def get_review_by_user_and_product(user_id, product_id):
+    review = reviews_collection.find_one(
+        {"user_id": user_id, "product_id": product_id}
+    )
+    return _serialize_review(review)
 
 
 def get_review_by_id(review_id):

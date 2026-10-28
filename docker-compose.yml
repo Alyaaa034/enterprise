@@ -1,17 +1,5 @@
+
 services:
-  product-service:
-    build: ./product-service
-    ports:
-      - "3003:3000"
-    environment:
-      - DB_HOST=product-db
-      - DB_USER=appuser
-      - DB_PORT=3306
-      - DB_PASSWORD=password
-      - DB_NAME=productdb
-    depends_on:
-      product-db:
-        condition: service_healthy
   product-db:
     image: mysql:8.4
     environment:
@@ -19,16 +7,69 @@ services:
       MYSQL_USER: appuser
       MYSQL_PASSWORD: password
       MYSQL_ROOT_PASSWORD: rootpassword
-
     volumes:
       - product-db-data:/var/lib/mysql
       - ./product-service/database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u=root", "--password=rootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "--password=rootpassword"]
       interval: 10s
       timeout: 5s
       retries: 5
-  
+
+  product-service:
+    build: ./product-service
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: product-db
+      DB_USER: appuser
+      DB_PORT: 3306
+      DB_PASSWORD: password
+      DB_NAME: productdb
+    depends_on:
+      product-db:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: cartdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - cart-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d cartdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cart-service:
+    build: ./cart-service
+    ports:
+      - "3001:3001"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "base64:K4q7v1m2N8p3Q6r9S0t5U4w7X1y2Z3a4B5c6D7e8F9g="
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: cartdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      PRODUCT_SERVICE_URL: http://product-service:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+
   review-db:
     image: mongo:7
     environment:
@@ -39,12 +80,7 @@ services:
     ports:
       - "27017:27017"
     healthcheck:
-      test:
-        - CMD
-        - mongosh
-        - --quiet
-        - --eval
-        - "db.adminCommand('ping').ok"
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +88,7 @@ services:
   review-service:
     build: ./review-service
     ports:
-      - "3004:3002"
+      - "3002:3002"
     environment:
       HOST: 0.0.0.0
       PORT: 3002
@@ -66,7 +102,54 @@ services:
       product-service:
         condition: service_started
 
+  order-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: orderdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - order-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uappuser", "--password=password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-service:
+    build: ./order-service
+    ports:
+      - "3003:3003"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "base64:K4q7v1m2N8p3Q6r9S0t5U4w7X1y2Z3a4B5c6D7e8F9g="
+      DB_CONNECTION: mysql
+      DB_HOST: order-db
+      DB_PORT: 3306
+      DB_DATABASE: orderdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: password
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      PRODUCT_SERVICE_URL: http://product-service:3000
+      CART_SERVICE_URL: http://cart-service:3001
+    depends_on:
+      order-db:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+      cart-service:
+        condition: service_started
 
 volumes:
   product-db-data:
   review-db-data:
+  order-db-data:
+  cart-postgres-data:
+    external: true
+    name: bacc4f991a8d49bc812ce538d2b5130ea5f84ce79f9ffe34e4f04fde957fcad7

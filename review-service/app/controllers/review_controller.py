@@ -5,6 +5,7 @@ import os
 from flask import jsonify, request
 from pymongo.errors import PyMongoError
 
+from app.database import client
 from app.exceptions import (
     ProductNotFoundError,
     ProductServiceUnavailableError,
@@ -64,6 +65,15 @@ def _handle_exception(exc):
 
     logger.exception("Kesalahan tidak terduga")
     return _error_response("Terjadi kesalahan pada server", 500, exc=exc)
+
+
+def health_check():
+    try:
+        client.admin.command("ping")
+        return jsonify({"status": "healthy"}), 200
+    except PyMongoError as exc:
+        logger.warning("Health check gagal karena MongoDB tidak tersedia: %s", exc)
+        return jsonify({"status": "unhealthy"}), 503
 
 
 def list_product_reviews(product_id):
