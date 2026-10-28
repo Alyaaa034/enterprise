@@ -18,3 +18,8 @@ Route::get('/orders/user/{userId}', [
 ])->whereNumber('userId');
 
 Route::get('/orders/{id}', [OrderController::class, 'show']);
+
+Route::patch('/orders/{id}/pay', [
+    OrderController::class,
+    'pay',
+])->whereNumber('id');

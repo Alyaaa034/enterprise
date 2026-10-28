@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentConflictException;
+use App\Services\PaymentService;
 use App\Http\Requests\ListUserOrdersRequest;
 use App\Services\OrderQueryService;
 use App\Exceptions\ProductNotFoundException;
@@ -21,7 +23,8 @@ class OrderController extends Controller
     public function __construct(
     private ProductService $productService,
     private CartServiceClient $cartService,
-    private OrderQueryService $orderQueryService
+    private OrderQueryService $orderQueryService,
+    private PaymentService $paymentService
 ) {}
 
    
@@ -185,4 +188,40 @@ class OrderController extends Controller
             'data' => $order,
         ], 200);
     }
+
+    public function pay(string $id): JsonResponse
+    {
+        if (!ctype_digit($id) || (int) $id < 1) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.',
+            ], 404);
+        }
+        
+        try {
+            $order = $this->paymentService->pay((int) $id);
+
+            return response()->json([
+                'message' => 'Pembayaran berhasil.',
+                'data' => $order,
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.',
+            ], 404);
+        } catch (PaymentConflictException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 409);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error(
+                'Gagal memproses pembayaran pesanan.',
+                ['order_id' => $id, 'exception' => $e]
+            );
+
+            return response()->json([
+                'message' => 'Terjadi kesalahan pada server.',
+            ], 500);
+        }
+    }
 }
+
