@@ -25,6 +25,10 @@ RUN composer install \
 
 COPY . .
 
+# Hapus cache Laravel dari lingkungan lokal agar tidak membawa
+# referensi provider yang tidak tersedia pada image produksi.
+RUN rm -f bootstrap/cache/packages.php bootstrap/cache/services.php
+
 RUN php artisan package:discover --ansi \
     && mkdir -p storage/framework/cache \
         storage/framework/sessions \

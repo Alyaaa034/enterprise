@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\OrderController;
 
 Route::get('/health', function () {
     return response()->json([
@@ -8,3 +9,4 @@ Route::get('/health', function () {
         'service' => 'order-service',
     ]);
 });
+Route::post('/orders', [OrderController::class, 'store']);
