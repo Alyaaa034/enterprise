@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ListUserOrdersRequest;
+use App\Services\OrderQueryService;
 use App\Exceptions\ProductNotFoundException;
 use App\Models\Order;
 use App\Services\CartServiceClient;
@@ -17,13 +19,13 @@ use Throwable;
 class OrderController extends Controller
 {
     public function __construct(
-        private ProductService $productService,
-        private CartServiceClient $cartService
-    ) {}
+    private ProductService $productService,
+    private CartServiceClient $cartService,
+    private OrderQueryService $orderQueryService
+) {}
 
-    /**
-     * Membuat pesanan berdasarkan isi keranjang pengguna.
-     */
+   
+    // Membuat pesanan berdasarkan isi keranjang pengguna.
     public function store(Request $request): JsonResponse
     {
         try {
@@ -139,9 +141,29 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Mengambil detail pesanan berdasarkan ID.
-     */
+    //Mengambil daftar pesanan milik pengguna.
+    public function indexByUser(
+        ListUserOrdersRequest $request,
+        string $userId
+    ): JsonResponse {
+        if (!ctype_digit($userId) || (int) $userId < 1) {
+            return response()->json([
+                'message' => 'Pengguna tidak valid.',
+            ], 404);
+        }
+
+        $orders = $this->orderQueryService->listForUser(
+            (int) $userId,
+            $request->validated('status')
+        );
+
+        return response()->json([
+            'message' => 'Daftar pesanan berhasil diambil.',
+            'data' => $orders,
+        ], 200);
+    }
+
+    //Mengambil detail pesanan berdasarkan ID.
     public function show(string $id): JsonResponse
     {
         if (!ctype_digit($id) || (int) $id < 1) {

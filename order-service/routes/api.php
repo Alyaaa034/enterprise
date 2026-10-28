@@ -11,4 +11,10 @@ Route::get('/health', function () {
 });
 
 Route::post('/orders', [OrderController::class, 'store']);
+
+Route::get('/orders/user/{userId}', [
+    OrderController::class,
+    'indexByUser',
+])->whereNumber('userId');
+
 Route::get('/orders/{id}', [OrderController::class, 'show']);
