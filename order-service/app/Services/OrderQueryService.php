@@ -23,4 +23,9 @@ class OrderQueryService
             ->orderByDesc('id')
             ->get();
     }
+
+    public function findById(int $id): ?Order
+    {
+        return Order::with('items')->find($id);
+    }
 }

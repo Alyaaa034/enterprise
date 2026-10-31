@@ -2,121 +2,49 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CreateOrderRequest;
+use App\Exceptions\CheckoutConflictException;
 use App\Exceptions\PaymentConflictException;
-use App\Services\PaymentService;
-use App\Http\Requests\ListUserOrdersRequest;
-use App\Services\OrderQueryService;
 use App\Exceptions\ProductNotFoundException;
+use App\Http\Requests\ListUserOrdersRequest;
 use App\Models\Order;
-use App\Services\CartServiceClient;
-use App\Services\ProductService;
+use App\Services\OrderQueryService;
+use App\Services\OrderService;
+use App\Services\PaymentService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
 class OrderController extends Controller
 {
     public function __construct(
-    private ProductService $productService,
-    private CartServiceClient $cartService,
-    private OrderQueryService $orderQueryService,
-    private PaymentService $paymentService
-) {}
+        private OrderService $orderService,
+        private OrderQueryService $orderQueryService,
+        private PaymentService $paymentService
+    ) {}
 
-   
     // Membuat pesanan berdasarkan isi keranjang pengguna.
-    public function store(Request $request): JsonResponse
+    public function store(CreateOrderRequest $request): JsonResponse
     {
         try {
-            $validated = $request->validate([
-                'user_id' => ['required', 'integer', 'min:1'],
-            ]);
+            $validated = $request->validated();
 
-            $userId = (int) $validated['user_id'];
-
-            $cart = $this->cartService->getCart($userId);
-            $items = $cart['items'];
-
-            if (count($items) === 0) {
-                return response()->json([
-                    'message' => 'Keranjang belanja kosong.',
-                ], 409);
-            }
-
-            $preparedItems = [];
-            $totalAmount = 0;
-
-            foreach ($items as $item) {
-                $productId = (int) ($item['product_id'] ?? 0);
-                $quantity = (int) ($item['quantity'] ?? 0);
-
-                if ($productId < 1 || $quantity < 1) {
-                    return response()->json([
-                        'message' => 'Data item keranjang tidak valid.',
-                    ], 409);
-                }
-
-                $product = $this->productService->getProduct($productId);
-
-                if ($quantity > (int) $product['stock']) {
-                    return response()->json([
-                        'message' => "Stok produk {$product['name']} tidak mencukupi.",
-                    ], 409);
-                }
-
-                $unitPrice = (float) $product['price'];
-                $subtotal = round($unitPrice * $quantity, 2);
-                $totalAmount += $subtotal;
-
-                $preparedItems[] = [
-                    'product_id' => $productId,
-                    'product_name' => $product['name'],
-                    'unit_price' => $unitPrice,
-                    'quantity' => $quantity,
-                    'subtotal' => $subtotal,
-                ];
-            }
-
-            $order = DB::transaction(function () use (
-                $userId,
-                $totalAmount,
-                $preparedItems
-            ) {
-                $order = Order::create([
-                    'user_id' => (string) $userId,
-                    'total_amount' => $totalAmount,
-                    'status' => 'PENDING',
-                ]);
-
-                $order->items()->createMany($preparedItems);
-
-                return $order->load('items');
-            });
-
-            try {
-                $this->cartService->clearCart($userId);
-            } catch (Throwable $e) {
-                Log::error(
-                    'Order berhasil dibuat, tetapi cart gagal dikosongkan.',
-                    [
-                        'order_id' => $order->id,
-                        'user_id' => $userId,
-                        'error' => $e->getMessage(),
-                    ]
-                );
-            }
+            $order = $this->orderService->createFromCart(
+                (int) $validated['user_id']
+            );
 
             return response()->json([
                 'message' => 'Pesanan berhasil dibuat.',
                 'data' => $order,
             ], 201);
 
-        } catch (ValidationException $e) {
-            throw $e;
+        } catch (CheckoutConflictException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 409);
 
         } catch (ProductNotFoundException $e) {
             return response()->json([
@@ -125,7 +53,7 @@ class OrderController extends Controller
 
         } catch (RuntimeException $e) {
             Log::error(
-                'Gagal membuat order karena layanan terkait bermasalah.',
+                'Gagal membuat pesanan karena layanan terkait bermasalah.',
                 ['error' => $e->getMessage()]
             );
 
@@ -134,7 +62,7 @@ class OrderController extends Controller
             ], 503);
 
         } catch (Throwable $e) {
-            Log::error('Gagal membuat order.', [
+            Log::error('Gagal membuat pesanan.', [
                 'error' => $e->getMessage(),
             ]);
 
@@ -144,7 +72,7 @@ class OrderController extends Controller
         }
     }
 
-    //Mengambil daftar pesanan milik pengguna.
+    // Mengambil daftar pesanan milik pengguna.
     public function indexByUser(
         ListUserOrdersRequest $request,
         string $userId
@@ -166,7 +94,7 @@ class OrderController extends Controller
         ], 200);
     }
 
-    //Mengambil detail pesanan berdasarkan ID.
+    // Mengambil detail pesanan berdasarkan ID.
     public function show(string $id): JsonResponse
     {
         if (!ctype_digit($id) || (int) $id < 1) {
@@ -189,6 +117,7 @@ class OrderController extends Controller
         ], 200);
     }
 
+    // Mengubah status pesanan dari PENDING menjadi PAID.
     public function pay(string $id): JsonResponse
     {
         if (!ctype_digit($id) || (int) $id < 1) {
@@ -196,7 +125,7 @@ class OrderController extends Controller
                 'message' => 'Pesanan tidak ditemukan.',
             ], 404);
         }
-        
+
         try {
             $order = $this->paymentService->pay((int) $id);
 
@@ -204,19 +133,22 @@ class OrderController extends Controller
                 'message' => 'Pembayaran berhasil.',
                 'data' => $order,
             ], 200);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+
+        } catch (ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Pesanan tidak ditemukan.',
             ], 404);
+
         } catch (PaymentConflictException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 409);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error(
-                'Gagal memproses pembayaran pesanan.',
-                ['order_id' => $id, 'exception' => $e]
-            );
+
+        } catch (Throwable $e) {
+            Log::error('Gagal memproses pembayaran pesanan.', [
+                'order_id' => $id,
+                'exception' => $e,
+            ]);
 
             return response()->json([
                 'message' => 'Terjadi kesalahan pada server.',
@@ -224,4 +156,3 @@ class OrderController extends Controller
         }
     }
 }
-
