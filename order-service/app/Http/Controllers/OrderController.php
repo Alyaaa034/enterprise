@@ -7,13 +7,11 @@ use App\Exceptions\CheckoutConflictException;
 use App\Exceptions\PaymentConflictException;
 use App\Exceptions\ProductNotFoundException;
 use App\Http\Requests\ListUserOrdersRequest;
-use App\Models\Order;
 use App\Services\OrderQueryService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -103,7 +101,7 @@ class OrderController extends Controller
             ], 404);
         }
 
-        $order = Order::with('items')->find((int) $id);
+        $order = $this->orderQueryService->findById((int) $id);
 
         if (!$order) {
             return response()->json([
@@ -116,8 +114,7 @@ class OrderController extends Controller
             'data' => $order,
         ], 200);
     }
-
-    // Mengubah status pesanan dari PENDING menjadi PAID.
+    // Memproses pembayaran pesanan.
     public function pay(string $id): JsonResponse
     {
         if (!ctype_digit($id) || (int) $id < 1) {
@@ -130,29 +127,27 @@ class OrderController extends Controller
             $order = $this->paymentService->pay((int) $id);
 
             return response()->json([
-                'message' => 'Pembayaran berhasil.',
+                'message' => 'Pembayaran pesanan berhasil.',
                 'data' => $order,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Pesanan tidak ditemukan.',
             ], 404);
-
         } catch (PaymentConflictException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 409);
-
         } catch (Throwable $e) {
             Log::error('Gagal memproses pembayaran pesanan.', [
                 'order_id' => $id,
-                'exception' => $e,
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Terjadi kesalahan pada server.',
+                'message' => 'Terjadi kesalahan saat memproses pembayaran.',
             ], 500);
         }
     }
 }
+
