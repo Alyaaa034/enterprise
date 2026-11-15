@@ -45,16 +45,17 @@ export async function getCartDetail(userId) {
     cart.items.map(async (item) => {
       try {
         const product = await getProduct(item.product_id)
-        return { ...item, product }
+        const subtotal = Number(product.price) * Number(item.quantity)
+
+        return { ...item, product, subtotal }
       } catch {
-        return { ...item, product: null }
+        return { ...item, product: null, subtotal: 0 }
       }
     }),
   )
 
   const totalPrice = items.reduce(
-    (total, item) =>
-      total + (item.product ? Number(item.product.price) * item.quantity : 0),
+    (total, item) => total + item.subtotal,
     0,
   )
 
