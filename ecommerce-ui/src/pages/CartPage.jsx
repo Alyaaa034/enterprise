@@ -11,8 +11,7 @@ import { formatRupiah } from '../utils/format'
 import Navbar from '../components/Navbar'
 import AsyncView from '../components/AsyncView'
 
-export default function CartPage() {
-  const userId = localStorage.getItem('userId') || '1'
+export default function CartPage({ userId, onUserChange }) {
   const { loading, data, error, reload } = useAsync(
     () => getCartDetail(userId),
     [userId],
@@ -66,11 +65,12 @@ export default function CartPage() {
 
   return (
     <>
-      <Navbar />
+      <Navbar userId={userId} onUserChange={onUserChange} />
 
       <main className="container">
         <div className="page-header">
           <h1>Keranjang Belanja</h1>
+
           <button
             onClick={handleClear}
             disabled={loading || actionLoading || !data?.items?.length}
@@ -85,7 +85,7 @@ export default function CartPage() {
           </p>
         )}
 
-        <AsyncView loading={loading} error={error}>
+        <AsyncView loading={loading} error={error} onRetry={reload}>
           {data?.items?.length ? (
             <>
               <div className="cart-list">
@@ -112,7 +112,9 @@ export default function CartPage() {
                         onClick={() =>
                           handleUpdate(item.id, item.quantity - 1)
                         }
-                        disabled={loading || actionLoading || item.quantity <= 1}
+                        disabled={
+                          loading || actionLoading || item.quantity <= 1
+                        }
                       >
                         -
                       </button>
@@ -140,9 +142,7 @@ export default function CartPage() {
               </div>
 
               <div className="cart-summary">
-                <h2>
-                  Total: {formatRupiah(data.totalPrice)}
-                </h2>
+                <h2>Total: {formatRupiah(data.totalPrice)}</h2>
               </div>
             </>
           ) : (

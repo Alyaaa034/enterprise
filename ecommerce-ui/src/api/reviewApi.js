@@ -1,5 +1,5 @@
 
- // src/api/reviewApi.js
+// src/api/reviewApi.js
 // Client untuk review-service.
 
 import { request } from './http'
@@ -12,5 +12,10 @@ export const getProductReviews = (productId) =>
 export const createReview = (productId, userId, rating, comment) =>
   request(BASE_URL, '/reviews', {
     method: 'POST',
-    body: { product_id: productId, user_id: userId, rating, comment },
+    body: {
+      product_id: Number(productId),
+      user_id: Number(userId),
+      rating: Number(rating),
+      comment: String(comment ?? ''),
+    },
   })

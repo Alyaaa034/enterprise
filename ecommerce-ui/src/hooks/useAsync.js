@@ -20,7 +20,7 @@ export function useAsync(asyncFunction, deps = []) {
     } finally {
       setLoading(false)
     }
-  }, deps)
+  }, [asyncFunction])
 
   useEffect(() => {
     let cancelled = false
@@ -44,6 +44,8 @@ export function useAsync(asyncFunction, deps = []) {
     return () => {
       cancelled = true
     }
+    // Dependencies tambahan disediakan oleh pemanggil hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
   return { loading, data, error, reload: execute }
