@@ -8,12 +8,23 @@ export default function ReviewForm({ productId, userId, onSubmit }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+
+    if (!comment.trim()) return
+
     setSubmitting(true)
 
     try {
-      await onSubmit(productId, userId, rating, comment)
-      setComment('')
-      setRating(5)
+      const result = await onSubmit(
+        productId,
+        userId,
+        rating,
+        comment.trim(),
+      )
+
+      if (result?.success) {
+        setComment('')
+        setRating(5)
+      }
     } finally {
       setSubmitting(false)
     }

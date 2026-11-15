@@ -29,7 +29,9 @@ export default function ProductDetailPage({ userId, onUserChange }) {
   const [reviewsError, setReviewsError] = useState(null)
   const [reviewsLoading, setReviewsLoading] = useState(false)
 
-  // Mengikuti data ulasan dari hasil pemuatan detail produk.
+  const [reviewMessage, setReviewMessage] = useState('')
+  const [reviewError, setReviewError] = useState(false)
+
   const currentReviews = reviews !== null ? reviews : data?.reviews
   const currentReviewsError = reviewsError ?? data?.reviewsError
 
@@ -73,8 +75,22 @@ export default function ProductDetailPage({ userId, onUserChange }) {
     rating,
     comment,
   ) => {
-    await createReview(productId, currentUserId, rating, comment)
-    await reloadReviews()
+    setReviewMessage('')
+    setReviewError(false)
+
+    try {
+      await createReview(productId, currentUserId, rating, comment)
+      await reloadReviews()
+
+      setReviewMessage('Ulasan berhasil dikirim.')
+      return { success: true }
+    } catch (err) {
+      setReviewError(true)
+      setReviewMessage(
+        err.message || 'Gagal mengirim ulasan. Silakan coba lagi.',
+      )
+      return { success: false }
+    }
   }
 
   return (
@@ -102,14 +118,10 @@ export default function ProductDetailPage({ userId, onUserChange }) {
 
                   <p>{data.product.description}</p>
 
-                  <p>
-                    Stok tersedia: {data.product.stock}
-                  </p>
+                  <p>Stok tersedia: {data.product.stock}</p>
 
                   <div className="cart-action">
-                    <label htmlFor="product-quantity">
-                      Jumlah:
-                    </label>
+                    <label htmlFor="product-quantity">Jumlah:</label>
 
                     <input
                       id="product-quantity"
@@ -132,13 +144,10 @@ export default function ProductDetailPage({ userId, onUserChange }) {
                       type="button"
                       onClick={handleAddToCart}
                       disabled={
-                        cartLoading ||
-                        Number(data.product.stock) < 1
+                        cartLoading || Number(data.product.stock) < 1
                       }
                     >
-                      {cartLoading
-                        ? 'Menambahkan...'
-                        : 'Tambah ke Keranjang'}
+                      {cartLoading ? 'Menambahkan...' : 'Tambah ke Keranjang'}
                     </button>
                   </div>
 
@@ -195,6 +204,15 @@ export default function ProductDetailPage({ userId, onUserChange }) {
                   userId={userId}
                   onSubmit={handleReviewSubmit}
                 />
+
+                {reviewMessage && (
+                  <p
+                    role="alert"
+                    className={reviewError ? 'error-message' : 'success-message'}
+                  >
+                    {reviewMessage}
+                  </p>
+                )}
               </section>
             </>
           )}
