@@ -4,6 +4,7 @@ import os
 from threading import Lock
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.exceptions import HTTPException
 
@@ -13,6 +14,25 @@ from app.routes.review_routes import review_bp
 load_dotenv()
 
 app = Flask(__name__)
+
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": [
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+                "http://127.0.0.1:4173",
+                "http://localhost:4173",
+                "http://127.0.0.1:4174",
+                "http://localhost:4174",
+            ]
+        }
+    },
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
 app.register_blueprint(review_bp)
 _database_initialization_lock = Lock()
 

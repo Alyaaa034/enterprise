@@ -35,6 +35,8 @@ export async function getProductDetail(id) {
     product: productResult.value,
     reviews:
       reviewResult.status === 'fulfilled' ? reviewResult.value : null,
+    reviewsError:
+      reviewResult.status === 'rejected' ? reviewResult.reason : null,
   }
 }
 

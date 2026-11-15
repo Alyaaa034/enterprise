@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { getProductDetail } from '../api/aggregate'
 import { addToCart } from '../api/cartApi'
-import { createReview } from '../api/reviewApi'
+import { getProductReviews, createReview } from '../api/reviewApi'
 import { formatRupiah } from '../utils/format'
 import Navbar from '../components/Navbar'
 import AsyncView from '../components/AsyncView'
@@ -24,6 +24,30 @@ export default function ProductDetailPage({ userId, onUserChange }) {
   const [cartLoading, setCartLoading] = useState(false)
   const [cartMessage, setCartMessage] = useState('')
   const [cartError, setCartError] = useState(false)
+
+  const [reviews, setReviews] = useState(null)
+  const [reviewsError, setReviewsError] = useState(null)
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+
+  // Mengikuti data ulasan dari hasil pemuatan detail produk.
+  const currentReviews = reviews !== null ? reviews : data?.reviews
+  const currentReviewsError = reviewsError ?? data?.reviewsError
+
+  const reloadReviews = async () => {
+    setReviewsLoading(true)
+    setReviewsError(null)
+
+    try {
+      const result = await getProductReviews(id)
+      setReviews(result)
+      setReviewsError(false)
+    } catch (err) {
+      setReviews(null)
+      setReviewsError(err)
+    } finally {
+      setReviewsLoading(false)
+    }
+  }
 
   const handleAddToCart = async () => {
     if (!data?.product) return
@@ -50,7 +74,7 @@ export default function ProductDetailPage({ userId, onUserChange }) {
     comment,
   ) => {
     await createReview(productId, currentUserId, rating, comment)
-    await reload()
+    await reloadReviews()
   }
 
   return (
@@ -132,20 +156,38 @@ export default function ProductDetailPage({ userId, onUserChange }) {
               <section className="reviews-section">
                 <h2>Ulasan Produk</h2>
 
-                <StarRating rating={data.reviews?.summary} />
+                {currentReviewsError ? (
+                  <div>
+                    <p className="error-message">
+                      Gagal memuat ulasan: {currentReviewsError.message}
+                    </p>
 
-                {data.reviews?.reviews?.length ? (
-                  data.reviews.reviews.map((review) => (
-                    <article className="review-card" key={review.id}>
-                      <p>
-                        <strong>Pengguna {review.user_id}</strong>
-                      </p>
-                      <p>Rating: {review.rating}/5</p>
-                      <p>{review.comment}</p>
-                    </article>
-                  ))
+                    <button
+                      type="button"
+                      onClick={reloadReviews}
+                      disabled={reviewsLoading}
+                    >
+                      {reviewsLoading ? 'Memuat...' : 'Coba Lagi'}
+                    </button>
+                  </div>
                 ) : (
-                  <p className="muted">Belum ada ulasan.</p>
+                  <>
+                    <StarRating rating={currentReviews?.summary} />
+
+                    {currentReviews?.reviews?.length ? (
+                      currentReviews.reviews.map((review) => (
+                        <article className="review-card" key={review.id}>
+                          <p>
+                            <strong>Pengguna {review.user_id}</strong>
+                          </p>
+                          <p>Rating: {review.rating}/5</p>
+                          <p>{review.comment}</p>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="muted">Belum ada ulasan.</p>
+                    )}
+                  </>
                 )}
 
                 <ReviewForm
